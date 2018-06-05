@@ -10,7 +10,7 @@ pragma solidity^0.4.20;
 interface IADS {
     function Create(string name, address currentAddress, string currentAbiLocation) public payable returns(uint newRouteId);
 
-    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) public payable returns(bool success);
+    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) public returns(bool success);
 
     function Get(uint _id, string _name) public view returns(string name, address addr, string abiUrl, uint released, uint version, uint update, address updateAddr, string updateAbiUrl, uint active, address owner, uint created);
 
@@ -34,7 +34,7 @@ interface IADS {
 }
 
 interface IPricing {
-    function GetPrice(address _sender, uint _option) external view returns (uint price);
+    function Price(uint _option) external view returns (uint price);
 }
 contract AtraOwners {
     address public owner;
@@ -107,7 +107,12 @@ contract ADS is IADS, AtraOwners {
         ContractNamesToRoutes[keccak256('')] = Routes.push(Route('', now, this, this, RouteData('',this), RouteData('',this), now, 0, now)) -1;
         // Register ADS to position 1
         ContractNamesToRoutes[keccak256('atra.ads')] = Routes.push(Route('atra.ads', now, msg.sender, msg.sender, RouteData('',this), RouteData('',this), now, 0, now)) -1;
+
         OwnersToRoutes[msg.sender].push(1);
+
+        ContractNamesToRoutes[keccak256('atra.ads.pricing')] = Routes.push(Route('atra.ads.pricing', now, msg.sender, msg.sender, RouteData('',this), RouteData('',this), now, 0, now)) -1;
+
+        OwnersToRoutes[msg.sender].push(2);
     }
 
     function Get(uint _id, string _name) public view returns(
@@ -185,7 +190,8 @@ contract ADS is IADS, AtraOwners {
     }
 
     function Create(string _name, address _addr, string _abiUrl) public payable returns(uint id) {
-        require(msg.sender == owner || msg.value == Price(0));
+        //require(msg.sender == owner || msg.value == Price(0));
+
         // validate inputs
         require(bytes(_name).length > 0 && bytes(_name).length <= 100 && bytes(_abiUrl).length <= 256);
         require(ContractNamesToRoutes[keccak256(_name)] == 0);
@@ -195,8 +201,9 @@ contract ADS is IADS, AtraOwners {
         return ContractNamesToRoutes[keccak256(_name)] = routeId;
     }
 
-    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) public payable returns(bool success) {
-        require(msg.sender == owner || msg.value == Price(1));
+    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) public returns(bool success) {
+        //require(msg.sender == owner || msg.value == Price(1));
+
         //dont require name validation since we aren't storing it
         require(bytes(_abiUrl).length <= 256);
         Route storage route;
@@ -205,6 +212,7 @@ contract ADS is IADS, AtraOwners {
         }else{
             route = Routes[_id];
         }
+
         require(route.owner == msg.sender); //require sender to be owner to update
 
         //if Next Contract Data is active do not overwrite Next data, move it to Current and increment the version
@@ -302,7 +310,7 @@ contract ADS is IADS, AtraOwners {
     function Price(uint _option) public view returns(uint price) {
         //Options: 0=create,1=update,2=transfer,3=accepttransfer
         IPricing pricingContract = IPricing(GetAddress(0,'atra.ads.pricing'));
-        return pricingContract.GetPrice(msg.sender, _option);
+        return pricingContract.Price(_option);
     }
 
     function Widthdraw(uint _amount) public isOwner returns(bool success) {

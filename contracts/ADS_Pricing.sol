@@ -1,12 +1,21 @@
 pragma solidity ^0.4.20;
 interface IADS {
-    function GetAddress(uint _id, string _name) public view returns(address addr);
+  function GetAddress(uint _id, string _name) public view returns(address addr);
+  function ScheduleUpdateForRoute(bytes32 _nameHash, uint _release, address _addr) public returns(bool);
+}
+interface IADS_Client {
+  function Update() public returns(bool);
 }
 interface IPricing {
-    function GetPrice(uint _option) external view returns (uint price);
-    function SetPriceForOption() external returns(bool success);
-    function AddCredits(address _user, uint _credits) external returns(bool success);
-    function GetCredits(address _sender) external view returns(uint amount);
+  function Credits(address _sender) external view returns(uint amount);
+
+  function Price(uint _option) external view returns(uint price);
+
+  function Charge(address _sender, uint _option) external returns(uint cost);
+
+  function SetPriceForOption(uint _option, uint _amount) external returns(bool success);
+
+  function AddCredits(address _user, uint _credits) external returns(bool success);
 }
 contract AtraOwners {
     address public owner;
@@ -51,7 +60,7 @@ library SafeMath {
         c = a / b;
     }
 }
-contract AtraAdsPricing is AtraOwners {
+contract ADS_Pricing is AtraOwners {
     using SafeMath for uint;
 
     mapping(address => uint) public credits;
@@ -68,7 +77,7 @@ contract AtraAdsPricing is AtraOwners {
     }
 
     function Price(uint _option) external view returns(uint price) {
-        return prices[_option];
+        return 909;
     }
 
     function Charge(address _sender, uint _option) external returns(uint cost) {
@@ -90,7 +99,7 @@ contract AtraAdsPricing is AtraOwners {
         return true;
     }
 
-    function AddCredits(address _user, uint _credits) public isOwner returns(bool success) {
+    function AddCredits(address _user, uint _credits) external isOwner returns(bool success) {
         credits[_user] = credits[_user].add(_credits);
         return true;
     }
