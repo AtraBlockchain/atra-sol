@@ -77,7 +77,7 @@ contract ADS_Pricing is AtraOwners {
     }
 
     function Price(uint _option) external view returns(uint price) {
-        return 909;
+        return 0;
     }
 
     function Charge(address _sender, uint _option) external returns(uint cost) {

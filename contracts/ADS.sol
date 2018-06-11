@@ -8,29 +8,29 @@ pragma solidity^0.4.20;
     Date: 4/4/18
 */
 interface IADS {
-    function Create(string name, address currentAddress, string currentAbiLocation) public payable returns(uint newRouteId);
+    function Create(string name, address currentAddress, string currentAbiLocation) external payable returns(uint newRouteId);
 
-    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) public returns(bool success);
+    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) external payable returns(bool success);
 
     function Get(uint _id, string _name) public view returns(string name, address addr, string abiUrl, uint released, uint version, uint update, address updateAddr, string updateAbiUrl, uint active, address owner, uint created);
 
-    function GetRouteIdsForOwner(address _owner) public view returns(uint[] routeIds);
+    function GetRouteIdsForOwner(address _owner) external view returns(uint[] routeIds);
 
-    function GetAddress(uint _id, string _name) public view returns(address addr);
+    function GetAddress(uint _id, string _name) external view returns(address addr);
 
-    function GetAddressAndAbi(uint _id, string _name) public view returns(address addr, string abiUrl);
+    function GetAddressAndAbi(uint _id, string _name) external view returns(address addr, string abiUrl);
 
-    function RoutesLength() public view returns(uint length);
+    function RoutesLength() external view returns(uint length);
 
-    function NameTaken(string _name) public view returns(bool taken);
+    function NameTaken(string _name) external view returns(bool taken);
 
-    function GetPendingRouteTransfer(uint _id, string _name) public view returns(address addr);
+    function GetPendingRouteTransfer(uint _id, string _name) external view returns(address addr);
 
-    function GetPendingTransfersForSender() public view returns(uint[] routeIds);
+    function GetPendingTransfersForSender() external view returns(uint[] routeIds);
 
-    function TransferRouteOwnership(uint _id, string _name, address _owner) public payable returns(bool success);
+    function TransferRouteOwnership(uint _id, string _name, address _owner) external payable returns(bool success);
 
-    function AcceptRouteOwnership(uint _id, string _name) public payable returns(bool success);
+    function AcceptRouteOwnership(uint _id, string _name) external payable returns(bool success);
 }
 
 interface IPricing {
@@ -104,15 +104,9 @@ contract ADS is IADS, AtraOwners {
     //Constructor
     constructor() public {
         // Create padding in Routes array to be able to check for unique name in list by returning 0 for no match
-        ContractNamesToRoutes[keccak256('')] = Routes.push(Route('', now, this, this, RouteData('',this), RouteData('',this), now, 0, now)) -1;
-        // Register ADS to position 1
-        ContractNamesToRoutes[keccak256('atra.ads')] = Routes.push(Route('atra.ads', now, msg.sender, msg.sender, RouteData('',this), RouteData('',this), now, 0, now)) -1;
-
-        OwnersToRoutes[msg.sender].push(1);
-
-        ContractNamesToRoutes[keccak256('atra.ads.pricing')] = Routes.push(Route('atra.ads.pricing', now, msg.sender, msg.sender, RouteData('',this), RouteData('',this), now, 0, now)) -1;
-
-        OwnersToRoutes[msg.sender].push(2);
+        _Create('',address(this),'');
+        _Create('atra.ads',address(this),'');
+        _Create('atra.ads.pricing',address(this),'');
     }
 
     function Get(uint _id, string _name) public view returns(
@@ -152,11 +146,13 @@ contract ADS is IADS, AtraOwners {
             );
     }
 
-    function GetRouteIdsForOwner(address _owner) public view returns(uint[] routeIds) {
+    function GetRouteIdsForOwner(address _owner) external view returns(uint[] routeIds) {
         return OwnersToRoutes[_owner];
     }
-
-    function GetAddress(uint _id, string _name) public view returns(address addr) {
+    function GetAddress(uint _id, string _name) external view returns(address addr) {
+      return _GetAddress(_id,_name);
+    }
+    function _GetAddress(uint _id, string _name) private view returns(address addr) {
         Route memory route;
         if(bytes(_name).length > 0){
             route = Routes[ContractNamesToRoutes[keccak256(_name)]];
@@ -166,7 +162,7 @@ contract ADS is IADS, AtraOwners {
         return route.updateRelease < now ? route.update.contractAddress : route.current.contractAddress;
     }
 
-    function GetAddressAndAbi(uint _id, string _name) public view returns(address addr, string abiUrl) {
+    function GetAddressAndAbi(uint _id, string _name) external view returns(address addr, string abiUrl) {
         Route memory route;
         if(bytes(_name).length > 0){
             route = Routes[ContractNamesToRoutes[keccak256(_name)]];
@@ -176,11 +172,11 @@ contract ADS is IADS, AtraOwners {
         return route.updateRelease < now ? (route.update.contractAddress, route.update.abiLocation) : (route.current.contractAddress, route.current.abiLocation);
     }
 
-    function RoutesLength() public view returns(uint length){
+    function RoutesLength() external view returns(uint length){
         return Routes.length;
     }
 
-    function NameTaken(string _name) public view returns(bool) {
+    function NameTaken(string _name) external view returns(bool) {
         require(bytes(_name).length > 0 && bytes(_name).length <= 100);
         if(ContractNamesToRoutes[keccak256(_name)] == 0){
             return false;//name is not taken
@@ -188,12 +184,17 @@ contract ADS is IADS, AtraOwners {
             return true;
         }
     }
-
-    function Create(string _name, address _addr, string _abiUrl) public payable returns(uint id) {
-        //require(msg.sender == owner || msg.value == Price(0));
-
-        // validate inputs
-        require(bytes(_name).length > 0 && bytes(_name).length <= 100 && bytes(_abiUrl).length <= 256);
+    function Create(string _name, address _addr, string _abiUrl) external payable returns(uint id) {
+      require(msg.sender == owner || msg.value == Price(0));
+      // validate inputs
+      require(bytes(_name).length > 0 && bytes(_name).length <= 100 && bytes(_abiUrl).length <= 256);
+      return _Create(_name, _addr, _abiUrl);
+    }
+    function _Create(string _name, address _addr, string _abiUrl) private returns(uint id) {
+        // ** Below is where the padding route object comes into play. ** //
+        // ** A mapping will return 0 if there is a hit and the array index is 0 AND if there is nothing found ** //
+        // ** To pervent this we add padding to the routes list by creating a blank record and requiring _name to have a length > 0 ** //
+        // ** The state below now will only return 0 if there isn't a route found ** //
         require(ContractNamesToRoutes[keccak256(_name)] == 0);
         uint routeId = Routes.push(Route(_name, now, msg.sender, msg.sender, RouteData(_abiUrl, _addr), RouteData(_abiUrl, _addr),now, 0, now)) -1;
         OwnersToRoutes[msg.sender].push(routeId);
@@ -201,8 +202,8 @@ contract ADS is IADS, AtraOwners {
         return ContractNamesToRoutes[keccak256(_name)] = routeId;
     }
 
-    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) public returns(bool success) {
-        //require(msg.sender == owner || msg.value == Price(1));
+    function ScheduleUpdate(uint _id, string _name, uint _release, address _addr, string _abiUrl) external payable returns(bool success) {
+        require(msg.sender == owner || msg.value == Price(1));
 
         //dont require name validation since we aren't storing it
         require(bytes(_abiUrl).length <= 256);
@@ -229,7 +230,7 @@ contract ADS is IADS, AtraOwners {
         return true; // return success
     }
 
-    function GetPendingRouteTransfer(uint _id, string _name) public view returns(address addr) {
+    function GetPendingRouteTransfer(uint _id, string _name) external view returns(address addr) {
         Route storage route;
         if(bytes(_name).length > 0){
             route = Routes[ContractNamesToRoutes[keccak256(_name)]];
@@ -239,18 +240,19 @@ contract ADS is IADS, AtraOwners {
         return route.newOwner != route.owner ? route.newOwner : address(0);
     }
 
-    function GetPendingTransfersForSender() public view returns(uint[] routeIds) {
+    function GetPendingTransfersForSender() external view returns(uint[] routeIds) {
         return OwnersToPendingTransfersByRouteId[msg.sender];
     }
 
-    function TransferRouteOwnership(uint _id, string _name, address _owner) public payable returns(bool success) {
+    function TransferRouteOwnership(uint _id, string _name, address _owner) external payable returns(bool success) {
         require(msg.sender == owner || msg.value == Price(2));
         Route storage route;
+        uint id = _id;
         if(bytes(_name).length > 0){
-            _id = ContractNamesToRoutes[keccak256(_name)];
+            id = ContractNamesToRoutes[keccak256(_name)];
             route = Routes[ContractNamesToRoutes[keccak256(_name)]];
         }else{
-            route = Routes[_id];
+            route = Routes[id];
         }
         require(route.owner == msg.sender); //require sender to be owner to transfer ownership
         route.newOwner = _owner; // set new owner
@@ -259,14 +261,15 @@ contract ADS is IADS, AtraOwners {
         return true; // return success
     }
 
-    function AcceptRouteOwnership(uint _id, string _name) public payable returns(bool success) {
+    function AcceptRouteOwnership(uint _id, string _name) external payable returns(bool success) {
         require(msg.sender == owner || msg.value == Price(3));
         Route storage route;
+        uint id = _id;
         if(bytes(_name).length > 0){
-            _id = ContractNamesToRoutes[keccak256(_name)];
+            id = ContractNamesToRoutes[keccak256(_name)];
             route = Routes[ContractNamesToRoutes[keccak256(_name)]];
         }else{
-            route = Routes[_id];
+            route = Routes[id];
         }
         require(route.newOwner == msg.sender); //require sender to be newOwner to accecpt ownership
 
@@ -309,7 +312,7 @@ contract ADS is IADS, AtraOwners {
 
     function Price(uint _option) public view returns(uint price) {
         //Options: 0=create,1=update,2=transfer,3=accepttransfer
-        IPricing pricingContract = IPricing(GetAddress(0,'atra.ads.pricing'));
+        IPricing pricingContract = IPricing(_GetAddress(0,'atra.ads.pricing'));
         return pricingContract.Price(_option);
     }
 
