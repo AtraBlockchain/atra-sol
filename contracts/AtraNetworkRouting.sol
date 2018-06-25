@@ -90,6 +90,7 @@ contract ADS is IADS, AtraOwners {
 
     // Declare Storage
     Route[] public Routes;
+    bool pendingReset = false;
     mapping(bytes32 => uint) public ContractNamesToRoutes; // (keccak256('Route Name') => routeId)
     mapping(address => uint[]) public OwnersToRoutes;
     mapping(address => uint[]) public OwnersToPendingTransfersByRouteId;
