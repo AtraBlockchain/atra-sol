@@ -96,8 +96,8 @@ contract ADS is IADS, AtraOwners {
     mapping(address => uint[]) public OwnersToPendingTransfersByRouteId;
 
     //Events
-    event RouteCreated(string name, address owner);
-    event UpdateScheduled(string name, address owner);
+    event RouteCreated(string name, address route, address owner);
+    event UpdateScheduled(string name, address route, address owner);
     event TransferOwnership(string name, address owner, address newOwner);
     event AcceptOwnership(string name, address newOwner);
 
@@ -198,7 +198,7 @@ contract ADS is IADS, AtraOwners {
         require(ContractNamesToRoutes[keccak256(_name)] == 0);
         uint routeId = Routes.push(Route(_name, now, msg.sender, msg.sender, RouteData(_abiUrl, _addr), RouteData(_abiUrl, _addr),now, 0, now)) -1;
         OwnersToRoutes[msg.sender].push(routeId);
-        emit RouteCreated(_name, msg.sender);
+        emit RouteCreated(_name, _addr, msg.sender);
         return ContractNamesToRoutes[keccak256(_name)] = routeId;
     }
 
@@ -226,7 +226,7 @@ contract ADS is IADS, AtraOwners {
         route.updateRelease = now.add(_release);// if updateRelease is zero update will be live now
         route.update.contractAddress = _addr; // update next address
         route.update.abiLocation = _abiUrl; // update next abi location
-        emit UpdateScheduled(route.name, msg.sender);
+        emit UpdateScheduled(route.name, _addr, msg.sender);
         return true; // return success
     }
 
